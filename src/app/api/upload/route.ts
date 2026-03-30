@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { put } from "@vercel/blob";
 import { randomUUID } from "crypto";
 
 export async function POST(request: Request) {
@@ -11,19 +10,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "לא נבחרו קבצים" }, { status: 400 });
   }
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
-  await mkdir(uploadDir, { recursive: true });
-
   const urls: string[] = [];
 
   for (const file of files) {
-    const ext = path.extname(file.name) || ".jpg";
-    const filename = `${randomUUID()}${ext}`;
-    const filepath = path.join(uploadDir, filename);
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const ext = file.name.split(".").pop() || "jpg";
+    const filename = `products/${randomUUID()}.${ext}`;
 
-    await writeFile(filepath, buffer);
-    urls.push(`/uploads/products/${filename}`);
+    const blob = await put(filename, file, {
+      access: "public",
+    });
+
+    urls.push(blob.url);
   }
 
   return NextResponse.json({ urls });

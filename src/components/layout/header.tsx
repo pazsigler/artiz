@@ -18,7 +18,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/">
-          <Image src="/logo.svg" alt="Artiz" width={120} height={40} priority />
+          <Image src="/logo.svg" alt="Artiz" width={84} height={28} priority />
         </Link>
 
         <nav className="hidden md:flex items-center gap-6">
