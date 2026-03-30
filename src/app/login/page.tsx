@@ -35,7 +35,8 @@ export default function LoginPage() {
 
     // TODO: Replace with Supabase auth
     // For now, allow mock login in development
-    if (data.email === "admin@artiz.co.il" && data.password === "admin123") {
+    const adminEmails = ["admin@artiz.co.il", "pazsigler@gmail.com"];
+    if (adminEmails.includes(data.email) && data.password === "admin123") {
       router.push("/admin");
       return;
     }
