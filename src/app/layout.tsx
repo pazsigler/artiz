@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Header } from "@/components/layout/header";
-import { SiteFooter } from "@/components/home/site-footer";
+import { Shell } from "@/components/layout/shell";
 
 export const metadata: Metadata = {
   title: "Artiz — מתנות בהתאמה אישית",
@@ -16,9 +15,7 @@ export default function RootLayout({
   return (
     <html lang="he" dir="rtl" className="h-full antialiased">
       <body className="min-h-full flex flex-col font-sans">
-        <Header />
-        <main className="flex-1">{children}</main>
-        <SiteFooter />
+        <Shell>{children}</Shell>
       </body>
     </html>
   );
