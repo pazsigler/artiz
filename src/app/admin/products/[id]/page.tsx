@@ -1,13 +1,14 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
+import Image from "next/image";
 import { AdminHeader } from "@/components/admin/admin-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Save, ArrowRight } from "lucide-react";
+import { Save, ArrowRight, X, ImagePlus, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { adminProducts, adminCategories } from "@/data/admin-mock";
 
@@ -31,6 +32,37 @@ export default function AdminProductEditPage() {
   const [previewY, setPreviewY] = useState("30");
   const [previewWidth, setPreviewWidth] = useState("50");
   const [previewHeight, setPreviewHeight] = useState("40");
+
+  // Image upload state
+  const [images, setImages] = useState<string[]>(product?.image ? [product.image] : []);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadFiles = useCallback(async (files: FileList | File[]) => {
+    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    imageFiles.forEach((f) => formData.append("files", f));
+
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.urls) {
+        setImages((prev) => [...prev, ...data.urls]);
+      }
+    } catch {
+      console.error("Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }, []);
+
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleSave = () => {
     // TODO: wire to API
@@ -104,8 +136,59 @@ export default function AdminProductEditPage() {
 
             <div className="space-y-2">
               <Label>תמונות</Label>
-              <div className="border-2 border-dashed rounded-lg p-8 text-center text-muted-foreground">
-                גרור תמונות לכאן או לחץ להעלאה
+
+              {/* Thumbnails */}
+              {images.length > 0 && (
+                <div className="grid grid-cols-4 gap-3">
+                  {images.map((src, i) => (
+                    <div key={src} className="relative group aspect-square rounded-lg overflow-hidden border">
+                      <Image src={src} alt={`תמונה ${i + 1}`} fill className="object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(i)}
+                        className="absolute top-1 left-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Drop zone */}
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                  dragOver ? "border-artiz-primary bg-artiz-primary/5" : "border-muted-foreground/30"
+                }`}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  uploadFiles(e.dataTransfer.files);
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => e.target.files && uploadFiles(e.target.files)}
+                />
+                {uploading ? (
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="text-sm">מעלה תמונות...</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <ImagePlus className="h-8 w-8" />
+                    <span className="text-sm">גרור תמונות לכאן או לחץ להעלאה</span>
+                    <span className="text-xs">JPG, PNG, WebP</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
