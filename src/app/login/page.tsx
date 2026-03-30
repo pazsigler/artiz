@@ -33,15 +33,20 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setError("");
 
-    // TODO: Replace with Supabase auth
-    // For now, allow mock login in development
-    const adminEmails = ["admin@artiz.co.il", "pazsigler@gmail.com"];
-    if (adminEmails.includes(data.email) && data.password === "admin123") {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    const result = await res.json();
+
+    if (result.success) {
       router.push("/admin");
       return;
     }
 
-    setError("אימייל או סיסמה שגויים");
+    setError(result.error || "אימייל או סיסמה שגויים");
   };
 
   return (
