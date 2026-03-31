@@ -1,25 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/admin-header";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
-import { adminProducts } from "@/data/admin-mock";
+import { Plus, Search, Pencil, Trash2, Loader2 } from "lucide-react";
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  status: string;
+  isCustomizable: boolean;
+  category: { name: string } | null;
+}
 
 export default function AdminProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "active" | "draft" | "archived">("all");
+  const [filter, setFilter] = useState<"all" | "ACTIVE" | "DRAFT" | "ARCHIVED">("all");
 
-  const filtered = adminProducts
+  useEffect(() => {
+    fetch("/api/admin/products")
+      .then((res) => res.json())
+      .then((data) => { setProducts(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const filtered = products
     .filter((p) => filter === "all" || p.status === filter)
-    .filter((p) => p.name.includes(search) || p.category.includes(search));
+    .filter((p) => p.name.includes(search) || p.category?.name.includes(search));
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("למחוק את המוצר?")) return;
+    await fetch("/api/admin/products", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+  };
 
   return (
     <>
-      <AdminHeader title="מוצרים" description={`${adminProducts.length} מוצרים`} />
+      <AdminHeader title="מוצרים" description={`${products.length} מוצרים`} />
 
       <div className="p-6 space-y-4 overflow-y-auto">
         {/* Toolbar */}
@@ -35,7 +63,7 @@ export default function AdminProductsPage() {
               />
             </div>
             <div className="flex gap-1">
-              {(["all", "active", "draft", "archived"] as const).map((f) => (
+              {(["all", "ACTIVE", "DRAFT", "ARCHIVED"] as const).map((f) => (
                 <Button
                   key={f}
                   size="sm"
@@ -43,7 +71,7 @@ export default function AdminProductsPage() {
                   onClick={() => setFilter(f)}
                   className={filter === f ? "bg-artiz-primary" : ""}
                 >
-                  {{ all: "הכל", active: "פעיל", draft: "טיוטה", archived: "ארכיון" }[f]}
+                  {{ all: "הכל", ACTIVE: "פעיל", DRAFT: "טיוטה", ARCHIVED: "ארכיון" }[f]}
                 </Button>
               ))}
             </div>
@@ -57,57 +85,67 @@ export default function AdminProductsPage() {
           </Link>
         </div>
 
-        {/* Table */}
-        <div className="rounded-xl border bg-white overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-muted-foreground">
-                <th className="text-right px-5 py-3 font-medium">מוצר</th>
-                <th className="text-right px-5 py-3 font-medium">קטגוריה</th>
-                <th className="text-right px-5 py-3 font-medium">מחיר</th>
-                <th className="text-right px-5 py-3 font-medium">מלאי</th>
-                <th className="text-right px-5 py-3 font-medium">סטטוס</th>
-                <th className="text-right px-5 py-3 font-medium">התאמה אישית</th>
-                <th className="text-right px-5 py-3 font-medium">פעולות</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((product) => (
-                <tr key={product.id} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="px-5 py-3 font-medium">{product.name}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{product.category}</td>
-                  <td className="px-5 py-3">₪{product.price}</td>
-                  <td className="px-5 py-3">{product.stock}</td>
-                  <td className="px-5 py-3">
-                    <StatusBadge status={product.status} />
-                  </td>
-                  <td className="px-5 py-3">
-                    {product.isCustomizable ? (
-                      <span className="text-artiz-pink text-xs font-medium">כן</span>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">לא</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3">
-                    <div className="flex gap-1">
-                      <Link href={`/admin/products/${product.id}`}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      </Link>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </td>
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="rounded-xl border bg-white overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-muted-foreground">
+                  <th className="text-right px-5 py-3 font-medium">מוצר</th>
+                  <th className="text-right px-5 py-3 font-medium">קטגוריה</th>
+                  <th className="text-right px-5 py-3 font-medium">מחיר</th>
+                  <th className="text-right px-5 py-3 font-medium">מלאי</th>
+                  <th className="text-right px-5 py-3 font-medium">סטטוס</th>
+                  <th className="text-right px-5 py-3 font-medium">התאמה אישית</th>
+                  <th className="text-right px-5 py-3 font-medium">פעולות</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
-            <p className="text-center text-muted-foreground py-10">לא נמצאו מוצרים</p>
-          )}
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((product) => (
+                  <tr key={product.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="px-5 py-3 font-medium">{product.name}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{product.category?.name || "—"}</td>
+                    <td className="px-5 py-3">₪{product.price}</td>
+                    <td className="px-5 py-3">{product.stock}</td>
+                    <td className="px-5 py-3">
+                      <StatusBadge status={product.status.toLowerCase() as "active" | "draft" | "archived"} />
+                    </td>
+                    <td className="px-5 py-3">
+                      {product.isCustomizable ? (
+                        <span className="text-artiz-pink text-xs font-medium">כן</span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">לא</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex gap-1">
+                        <Link href={`/admin/products/${product.id}`}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => handleDelete(product.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filtered.length === 0 && (
+              <p className="text-center text-muted-foreground py-10">לא נמצאו מוצרים</p>
+            )}
+          </div>
+        )}
       </div>
     </>
   );

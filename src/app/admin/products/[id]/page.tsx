@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { AdminHeader } from "@/components/admin/admin-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,29 +9,31 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Save, ArrowRight, X, ImagePlus, Loader2, Star } from "lucide-react";
 import Link from "next/link";
-import { adminProducts, adminCategories } from "@/data/admin-mock";
 
 interface UploadedImage {
-  /** Local blob URL for preview, or proxied URL for saved images */
   preview: string;
-  /** Vercel Blob URL for storage */
   blobUrl: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 export default function AdminProductEditPage() {
   const params = useParams();
   const router = useRouter();
   const isNew = params.id === "new";
-  const product = isNew ? null : adminProducts.find((p) => p.id === params.id);
 
-  const [name, setName] = useState(product?.name || "");
-  const [price, setPrice] = useState(product?.price?.toString() || "");
-  const [categoryId, setCategoryId] = useState(product?.categoryId || "");
-  const [status, setStatus] = useState(product?.status || "draft");
-  const [stock, setStock] = useState(product?.stock?.toString() || "0");
-  const [isCustomizable, setIsCustomizable] = useState(product?.isCustomizable || false);
+  const [loading, setLoading] = useState(!isNew);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [status, setStatus] = useState("DRAFT");
+  const [stock, setStock] = useState("0");
+  const [isCustomizable, setIsCustomizable] = useState(false);
 
-  // Customization fields
   const [maxChars, setMaxChars] = useState("30");
   const [fonts, setFonts] = useState("Einstein, Rubik, Heebo");
   const [previewX, setPreviewX] = useState("25");
@@ -39,10 +41,7 @@ export default function AdminProductEditPage() {
   const [previewWidth, setPreviewWidth] = useState("50");
   const [previewHeight, setPreviewHeight] = useState("40");
 
-  // Image upload state
-  const [mainImage, setMainImage] = useState<UploadedImage | null>(
-    product?.image ? { preview: `/api/image?url=${encodeURIComponent(product.image)}`, blobUrl: product.image } : null
-  );
+  const [mainImage, setMainImage] = useState<UploadedImage | null>(null);
   const [gallery, setGallery] = useState<UploadedImage[]>([]);
   const [uploading, setUploading] = useState<"main" | "gallery" | null>(null);
   const [uploadError, setUploadError] = useState("");
@@ -50,6 +49,46 @@ export default function AdminProductEditPage() {
   const [galleryDragOver, setGalleryDragOver] = useState(false);
   const mainFileRef = useRef<HTMLInputElement>(null);
   const galleryFileRef = useRef<HTMLInputElement>(null);
+
+  // Load categories
+  useEffect(() => {
+    fetch("/api/admin/categories").then((r) => r.json()).then(setCategories).catch(() => {});
+  }, []);
+
+  // Load product data when editing
+  useEffect(() => {
+    if (isNew) return;
+    fetch("/api/admin/products")
+      .then((r) => r.json())
+      .then((products) => {
+        const p = products.find((prod: { id: string }) => prod.id === params.id);
+        if (p) {
+          setName(p.name);
+          setPrice(p.price.toString());
+          setCategoryId(p.categoryId);
+          setStatus(p.status);
+          setStock(p.stock.toString());
+          setIsCustomizable(p.isCustomizable);
+          if (p.mainImage) {
+            setMainImage({ preview: `/api/image?url=${encodeURIComponent(p.mainImage)}`, blobUrl: p.mainImage });
+          }
+          if (p.images?.length) {
+            setGallery(p.images.map((url: string) => ({ preview: `/api/image?url=${encodeURIComponent(url)}`, blobUrl: url })));
+          }
+          if (p.previewConfig) {
+            const cfg = p.previewConfig;
+            if (cfg.maxChars) setMaxChars(cfg.maxChars.toString());
+            if (cfg.fonts) setFonts(cfg.fonts.join(", "));
+            if (cfg.x) setPreviewX(cfg.x.toString());
+            if (cfg.y) setPreviewY(cfg.y.toString());
+            if (cfg.width) setPreviewWidth(cfg.width.toString());
+            if (cfg.height) setPreviewHeight(cfg.height.toString());
+          }
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [isNew, params.id]);
 
   const uploadFile = useCallback(async (file: File): Promise<UploadedImage | null> => {
     const preview = URL.createObjectURL(file);
@@ -59,10 +98,7 @@ export default function AdminProductEditPage() {
     try {
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const data = await res.json();
-      if (data.error) {
-        setUploadError(data.error);
-        return null;
-      }
+      if (data.error) { setUploadError(data.error); return null; }
       return { preview, blobUrl: data.urls[0] };
     } catch {
       setUploadError("שגיאה בהעלאת התמונה");
@@ -137,10 +173,21 @@ export default function AdminProductEditPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <>
+        <AdminHeader title="טוען..." description="" />
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <AdminHeader
-        title={isNew ? "מוצר חדש" : `עריכת: ${product?.name || ""}`}
+        title={isNew ? "מוצר חדש" : `עריכת: ${name}`}
         description={isNew ? "צור מוצר חדש" : "עדכן פרטי מוצר"}
       />
 
@@ -182,7 +229,7 @@ export default function AdminProductEditPage() {
                   className="w-full rounded-md border px-3 py-2 text-sm"
                 >
                   <option value="">בחר קטגוריה</option>
-                  {adminCategories.map((cat) => (
+                  {categories.map((cat) => (
                     <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </select>
@@ -191,12 +238,12 @@ export default function AdminProductEditPage() {
                 <Label>סטטוס</Label>
                 <select
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as "active" | "draft" | "archived")}
+                  onChange={(e) => setStatus(e.target.value)}
                   className="w-full rounded-md border px-3 py-2 text-sm"
                 >
-                  <option value="draft">טיוטה</option>
-                  <option value="active">פעיל</option>
-                  <option value="archived">ארכיון</option>
+                  <option value="DRAFT">טיוטה</option>
+                  <option value="ACTIVE">פעיל</option>
+                  <option value="ARCHIVED">ארכיון</option>
                 </select>
               </div>
             </div>
