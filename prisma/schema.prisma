@@ -21,12 +21,15 @@ model Category {
 model Product {
   id               String  @id @default(cuid())
   name             String
-  description      String
+  description      String  @default("")
   price            Float
+  mainImage        String?
+  images           String[]
+  stock            Int      @default(0)
+  status           ProductStatus @default(DRAFT)
   isCustomizable   Boolean @default(false)
   customizationType String?
   previewConfig    Json?
-  images           String[]
   categoryId       String
   category         Category @relation(fields: [categoryId], references: [id])
 
@@ -84,6 +87,12 @@ model Coupon {
   expiresAt   DateTime?
 
   createdAt DateTime @default(now())
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
 }
 
 enum OrderStatus {

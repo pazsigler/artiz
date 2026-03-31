@@ -1,11 +1,14 @@
 import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// Prisma v7: adapter is configured at runtime when connecting to a real DB.
-// For now, create a client instance that will be configured when Supabase is set up.
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({} as never);
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
+  });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

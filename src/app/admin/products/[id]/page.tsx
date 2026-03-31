@@ -96,14 +96,45 @@ export default function AdminProductEditPage() {
     setGallery((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSave = () => {
-    // TODO: wire to API
-    console.log("Save product:", {
-      name, price, categoryId, status, stock, isCustomizable,
-      mainImage: mainImage?.blobUrl,
-      gallery: gallery.map((g) => g.blobUrl),
-    });
-    router.push("/admin/products");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError("");
+
+    const payload = {
+      ...(isNew ? {} : { id: params.id }),
+      name,
+      price,
+      categoryId,
+      status,
+      stock,
+      isCustomizable,
+      mainImage: mainImage?.blobUrl || null,
+      images: gallery.map((g) => g.blobUrl),
+      previewConfig: isCustomizable
+        ? { maxChars: +maxChars, fonts: fonts.split(",").map((f) => f.trim()), x: +previewX, y: +previewY, width: +previewWidth, height: +previewHeight }
+        : null,
+    };
+
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: isNew ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setSaveError(data.error);
+      } else {
+        router.push("/admin/products");
+      }
+    } catch {
+      setSaveError("שגיאה בשמירת המוצר");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -333,10 +364,14 @@ export default function AdminProductEditPage() {
             )}
           </div>
 
+          {saveError && (
+            <p className="text-sm text-destructive text-center">{saveError}</p>
+          )}
+
           <div className="flex gap-3">
-            <Button onClick={handleSave} className="bg-artiz-primary hover:bg-artiz-primary/90 text-white">
-              <Save className="ml-2 h-4 w-4" />
-              שמור
+            <Button onClick={handleSave} disabled={saving} className="bg-artiz-primary hover:bg-artiz-primary/90 text-white">
+              {saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+              {saving ? "שומר..." : "שמור"}
             </Button>
             <Link href="/admin/products">
               <Button variant="outline">ביטול</Button>
