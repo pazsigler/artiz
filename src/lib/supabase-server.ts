@@ -1,12 +1,10 @@
-import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-export async function POST(request: Request) {
-  const { email, password } = await request.json();
+export async function createServerSupabase() {
   const cookieStore = await cookies();
 
-  const supabase = createServerClient(
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -20,24 +18,10 @@ export async function POST(request: Request) {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // ignore
+            // Called from Server Component — ignore
           }
         },
       },
     }
   );
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.user) {
-    return NextResponse.json(
-      { success: false, error: "אימייל או סיסמה שגויים" },
-      { status: 401 }
-    );
-  }
-
-  return NextResponse.json({ success: true });
 }

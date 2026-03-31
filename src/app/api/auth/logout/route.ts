@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-export async function POST(request: Request) {
-  const { email, password } = await request.json();
+export async function POST() {
   const cookieStore = await cookies();
 
   const supabase = createServerClient(
@@ -27,17 +26,6 @@ export async function POST(request: Request) {
     }
   );
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.user) {
-    return NextResponse.json(
-      { success: false, error: "אימייל או סיסמה שגויים" },
-      { status: 401 }
-    );
-  }
-
+  await supabase.auth.signOut();
   return NextResponse.json({ success: true });
 }
