@@ -36,6 +36,7 @@ export default function AdminProductEditPage() {
   // Image upload state
   const [images, setImages] = useState<string[]>(product?.image ? [product.image] : []);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,17 +45,21 @@ export default function AdminProductEditPage() {
     if (imageFiles.length === 0) return;
 
     setUploading(true);
+    setUploadError("");
     const formData = new FormData();
     imageFiles.forEach((f) => formData.append("files", f));
 
     try {
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const data = await res.json();
-      if (data.urls) {
+      if (data.error) {
+        setUploadError(data.error);
+      } else if (data.urls) {
         setImages((prev) => [...prev, ...data.urls]);
       }
-    } catch {
-      console.error("Upload failed");
+    } catch (err) {
+      setUploadError("שגיאה בהעלאת התמונה");
+      console.error("Upload failed", err);
     } finally {
       setUploading(false);
     }
@@ -190,6 +195,9 @@ export default function AdminProductEditPage() {
                   </div>
                 )}
               </div>
+              {uploadError && (
+                <p className="text-sm text-destructive">{uploadError}</p>
+              )}
             </div>
           </div>
 
