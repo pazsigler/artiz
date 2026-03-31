@@ -7,9 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Save, ArrowRight, X, ImagePlus, Loader2 } from "lucide-react";
+import { Save, ArrowRight, X, ImagePlus, Loader2, Star } from "lucide-react";
 import Link from "next/link";
 import { adminProducts, adminCategories } from "@/data/admin-mock";
+
+interface UploadedImage {
+  /** Local blob URL for preview, or proxied URL for saved images */
+  preview: string;
+  /** Vercel Blob URL for storage */
+  blobUrl: string;
+}
 
 export default function AdminProductEditPage() {
   const params = useParams();
@@ -33,44 +40,69 @@ export default function AdminProductEditPage() {
   const [previewHeight, setPreviewHeight] = useState("40");
 
   // Image upload state
-  const [images, setImages] = useState<string[]>(product?.image ? [product.image] : []);
-  const [uploading, setUploading] = useState(false);
+  const [mainImage, setMainImage] = useState<UploadedImage | null>(
+    product?.image ? { preview: `/api/image?url=${encodeURIComponent(product.image)}`, blobUrl: product.image } : null
+  );
+  const [gallery, setGallery] = useState<UploadedImage[]>([]);
+  const [uploading, setUploading] = useState<"main" | "gallery" | null>(null);
   const [uploadError, setUploadError] = useState("");
-  const [dragOver, setDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [mainDragOver, setMainDragOver] = useState(false);
+  const [galleryDragOver, setGalleryDragOver] = useState(false);
+  const mainFileRef = useRef<HTMLInputElement>(null);
+  const galleryFileRef = useRef<HTMLInputElement>(null);
 
-  const uploadFiles = useCallback(async (files: FileList | File[]) => {
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (imageFiles.length === 0) return;
-
-    setUploading(true);
-    setUploadError("");
+  const uploadFile = useCallback(async (file: File): Promise<UploadedImage | null> => {
+    const preview = URL.createObjectURL(file);
     const formData = new FormData();
-    imageFiles.forEach((f) => formData.append("files", f));
+    formData.append("files", file);
 
     try {
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const data = await res.json();
       if (data.error) {
         setUploadError(data.error);
-      } else if (data.urls) {
-        setImages((prev) => [...prev, ...data.urls]);
+        return null;
       }
-    } catch (err) {
+      return { preview, blobUrl: data.urls[0] };
+    } catch {
       setUploadError("שגיאה בהעלאת התמונה");
-      console.error("Upload failed", err);
-    } finally {
-      setUploading(false);
+      return null;
     }
   }, []);
 
-  const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
+  const handleMainUpload = useCallback(async (files: FileList) => {
+    const file = Array.from(files).find((f) => f.type.startsWith("image/"));
+    if (!file) return;
+    setUploading("main");
+    setUploadError("");
+    const result = await uploadFile(file);
+    if (result) setMainImage(result);
+    setUploading(null);
+  }, [uploadFile]);
+
+  const handleGalleryUpload = useCallback(async (files: FileList) => {
+    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    setUploading("gallery");
+    setUploadError("");
+    for (const file of imageFiles) {
+      const result = await uploadFile(file);
+      if (result) setGallery((prev) => [...prev, result]);
+    }
+    setUploading(null);
+  }, [uploadFile]);
+
+  const removeGalleryImage = (index: number) => {
+    setGallery((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSave = () => {
     // TODO: wire to API
-    console.log("Save product:", { name, price, categoryId, status, stock, isCustomizable });
+    console.log("Save product:", {
+      name, price, categoryId, status, stock, isCustomizable,
+      mainImage: mainImage?.blobUrl,
+      gallery: gallery.map((g) => g.blobUrl),
+    });
     router.push("/admin/products");
   };
 
@@ -137,68 +169,116 @@ export default function AdminProductEditPage() {
                 </select>
               </div>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label>תמונות</Label>
+          {/* Main Image */}
+          <div className="rounded-xl border bg-white p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Star className="h-4 w-4 text-artiz-pink" />
+              <h2 className="font-bold text-artiz-primary">תמונה ראשית</h2>
+            </div>
 
-              {/* Thumbnails */}
-              {images.length > 0 && (
-                <div className="grid grid-cols-4 gap-3">
-                  {images.map((src, i) => (
-                    <div key={src} className="relative group aspect-square rounded-lg overflow-hidden border">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt={`תמונה ${i + 1}`} className="absolute inset-0 w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(i)}
-                        className="absolute top-1 left-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Drop zone */}
+            {mainImage ? (
+              <div className="relative group w-48 aspect-square rounded-lg overflow-hidden border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={mainImage.preview} alt="תמונה ראשית" className="absolute inset-0 w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setMainImage(null)}
+                  className="absolute top-2 left-2 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
               <div
                 className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                  dragOver ? "border-artiz-primary bg-artiz-primary/5" : "border-muted-foreground/30"
+                  mainDragOver ? "border-artiz-primary bg-artiz-primary/5" : "border-muted-foreground/30"
                 }`}
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOver(false);
-                  uploadFiles(e.dataTransfer.files);
-                }}
+                onClick={() => mainFileRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setMainDragOver(true); }}
+                onDragLeave={() => setMainDragOver(false)}
+                onDrop={(e) => { e.preventDefault(); setMainDragOver(false); handleMainUpload(e.dataTransfer.files); }}
               >
                 <input
-                  ref={fileInputRef}
+                  ref={mainFileRef}
                   type="file"
                   accept="image/*"
-                  multiple
                   className="hidden"
-                  onChange={(e) => e.target.files && uploadFiles(e.target.files)}
+                  onChange={(e) => e.target.files && handleMainUpload(e.target.files)}
                 />
-                {uploading ? (
+                {uploading === "main" ? (
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
                     <Loader2 className="h-8 w-8 animate-spin" />
-                    <span className="text-sm">מעלה תמונות...</span>
+                    <span className="text-sm">מעלה תמונה...</span>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
                     <ImagePlus className="h-8 w-8" />
-                    <span className="text-sm">גרור תמונות לכאן או לחץ להעלאה</span>
-                    <span className="text-xs">JPG, PNG, WebP</span>
+                    <span className="text-sm">העלה תמונה ראשית</span>
+                    <span className="text-xs">התמונה שתוצג בכרטיס המוצר</span>
                   </div>
                 )}
               </div>
-              {uploadError && (
-                <p className="text-sm text-destructive">{uploadError}</p>
+            )}
+          </div>
+
+          {/* Gallery */}
+          <div className="rounded-xl border bg-white p-6 space-y-4">
+            <h2 className="font-bold text-artiz-primary">גלריית תמונות</h2>
+
+            {gallery.length > 0 && (
+              <div className="grid grid-cols-4 gap-3">
+                {gallery.map((img, i) => (
+                  <div key={img.blobUrl} className="relative group aspect-square rounded-lg overflow-hidden border">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.preview} alt={`תמונה ${i + 1}`} className="absolute inset-0 w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeGalleryImage(i)}
+                      className="absolute top-1 left-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                galleryDragOver ? "border-artiz-primary bg-artiz-primary/5" : "border-muted-foreground/30"
+              }`}
+              onClick={() => galleryFileRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setGalleryDragOver(true); }}
+              onDragLeave={() => setGalleryDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setGalleryDragOver(false); handleGalleryUpload(e.dataTransfer.files); }}
+            >
+              <input
+                ref={galleryFileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => e.target.files && handleGalleryUpload(e.target.files)}
+              />
+              {uploading === "gallery" ? (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                  <span className="text-sm">מעלה תמונות...</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <ImagePlus className="h-8 w-8" />
+                  <span className="text-sm">גרור תמונות לכאן או לחץ להעלאה</span>
+                  <span className="text-xs">JPG, PNG, WebP — ניתן להעלות מספר תמונות</span>
+                </div>
               )}
             </div>
+
+            {uploadError && (
+              <p className="text-sm text-destructive">{uploadError}</p>
+            )}
           </div>
 
           {/* Customization */}
