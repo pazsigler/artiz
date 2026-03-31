@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       const filename = `products/${randomUUID()}.${ext}`;
 
       const blob = await put(filename, file, {
-        access: "public",
+        access: "private",
       });
 
       urls.push(blob.url);
