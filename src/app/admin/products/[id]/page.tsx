@@ -2,7 +2,6 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useRef, useCallback } from "react";
-import Image from "next/image";
 import { AdminHeader } from "@/components/admin/admin-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -147,7 +146,8 @@ export default function AdminProductEditPage() {
                 <div className="grid grid-cols-4 gap-3">
                   {images.map((src, i) => (
                     <div key={src} className="relative group aspect-square rounded-lg overflow-hidden border">
-                      <Image src={src} alt={`תמונה ${i + 1}`} fill className="object-cover" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt={`תמונה ${i + 1}`} className="absolute inset-0 w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => removeImage(i)}
