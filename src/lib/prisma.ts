@@ -1,3 +1,6 @@
+// Must be set before any connection is created
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
